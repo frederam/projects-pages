@@ -1,0 +1,42 @@
+name: Deploy to Orbiter
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Orbiter CLI
+        run: npm install -g orbiter-cli@latest
+
+      - name: Login to Orbiter
+        run: orbiter auth --key ${{ secrets.ORBITER_API_KEY }}
+
+      - name: Deploy site
+        run: |
+          rm -rf .git .github
+
+          SITE_LIST=$(orbiter list)
+
+          if echo "$SITE_LIST" | grep -q "${{ secrets.ORBITER_DOMAIN }}"; then
+           echo "Updating existing site..."
+           orbiter update --siteId ${{ secrets.ORBITER_SITE_ID }} .
+          else
+           echo "Creating a new site..."
+           orbiter create --domain ${{ secrets.ORBITER_DOMAIN }} .
+          fi
+
+      - name: Show deployed sites
+        run: orbiter list
