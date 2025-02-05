@@ -6,60 +6,89 @@ const $thead = $("thead");
 const $tbody = $("tbody");
 
 const ROWS = 10;
-const COLUMNS = 5;
+const COLUMNS = 20;
 const FIRST_CHAR_CODE = 65;
 
 const range = (length) => Array.from({ length }, (_, i) => i);
 const getColumnLetter = (i) => String.fromCharCode(i + FIRST_CHAR_CODE);
 
+let dependencies = {};
+let dependents = {};
+
 let STATE = range(COLUMNS).map((i) => range(ROWS).map((j) => ({ computedValue: 0, value: 0 })));
 
 function updateCell({ x, y, value }) {
   const newState = structuredClone(STATE);
-  const constants = generateCellsConstants(newState);
-
+  
   const cell = newState[x][y];
-
-  cell.computedValue = computeValue(value, constants); //span
-  cell.value = value; //input
-
-  newState[x][y] = cell;
-
+  cell.value = value;
+  
+  computeAllCells(newState);
   STATE = newState;
+
+  updateDependentCells(x, y);
 
   renderSpreadSheet();
 }
 
-function generateCellsConstants(cells) {
-  return cells
-    .map((rows, x) => {
-      return rows
-        .map((cell, y) => {
-          const letter = getColumnLetter(x);
-          const cellId = `${letter}${y + 1}`;
-          return `const ${cellId} = ${cell.computedValue};`;
-        })
-        .join("\n");
-    })
-    .join("\n");
+
+function computeAllCells(cells) {
+  dependencies = {};
+  dependents = {};
+
+  cells.forEach((rows, x) => {
+    rows.forEach((cell, y) => {
+      cell.computedValue = computeValue(cell.value, x, y);
+    });
+  });
 }
 
-function computeValue(value, constants) {
+function computeValue(value, x, y) {
+  if (typeof value === "number") return value;
   if (!value.startsWith("=")) return value;
 
-  const formula = value.slice(1);
+  const formula = value.slice(1).toUpperCase();
 
-  let computedValue;
+  const key = `${x},${y}`;
+  dependencies[key] = new Set();
+
   try {
-    computedValue = eval(`(() => {
-      ${constants}
-      return ${formula};
-    })()`);
-  } catch (e) {
-    computedValue = `!ERROR: ${e.message}`;
-  }
+    const formulaWithValues = formula.replace(/([A-Z]+)(\d+)/g, (match, colLetter, rowNum) => {
+      const colIndex = colLetter.charCodeAt(0) - FIRST_CHAR_CODE;
+      const rowIndex = parseInt(rowNum, 10) - 1;
 
-  return computedValue;
+      if (colIndex < 0 || colIndex >= COLUMNS || rowIndex < 0 || rowIndex >= ROWS) {
+        throw new Error(`Invalid reference: ${match}`);
+      }
+
+      dependencies[key].add(`${colIndex},${rowIndex}`);
+
+      const refKey = `${colIndex},${rowIndex}`;
+      if (!dependents[refKey]) dependents[refKey] = new Set();
+      dependents[refKey].add(key);
+
+      return STATE[colIndex][rowIndex].computedValue || 0;
+    });
+
+    return eval(formulaWithValues);
+  } catch (e) {
+    return `!ERROR`;
+  }
+}
+
+function updateDependentCells(x, y) {
+  const key = `${x},${y}`;
+  if (!dependents[key]) return;
+
+  dependents[key].forEach((dep) => {
+    const [depX, depY] = dep.split(",").map(Number);
+    const cell = STATE[depX][depY];
+
+    cell.computedValue = computeValue(cell.value, depX, depY);
+    updateDependentCells(depX, depY);
+  });
+
+  renderSpreadSheet();
 }
 
 const renderSpreadSheet = () => {
@@ -98,7 +127,6 @@ $tbody.addEventListener("click", (event) => {
 
   const { x, y } = td.dataset;
   const input = td.querySelector("input");
-  const span = td.querySelector("span");
 
   const end = input.value.length;
   input.setSelectionRange(end, end);
