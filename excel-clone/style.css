@@ -3,8 +3,10 @@ body {
     "Helvetica Neue", sans-serif;
 }
 
-*, *::before, *::after {
-    box-sizing: border-box;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 img {
@@ -12,8 +14,16 @@ img {
   height: auto;
 }
 
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
 table {
+  min-width: 1200px;
   border-collapse: collapse;
+  table-layout: fixed;
+  max-width: none;
 }
 
 thead,
@@ -58,10 +68,26 @@ input {
   opacity: 0;
   pointer-events: none;
   width: 100%;
-  border-radius: 2px;
+}
 
-  &:focus{
-    opacity: 1;
-    outline: 2px solid #09f;
-  }
+input.editing {
+  pointer-events: auto;
+  opacity: 1;
+  border: 0;
+  outline: none;
+}
+
+td:focus-within {
+  outline: 2px solid #008000;
+}
+
+td span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  direction: rtl;
+  pointer-events: none;
+  padding: 0 3px;
 }
